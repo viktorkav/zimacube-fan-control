@@ -80,7 +80,7 @@ Notes:
 | 80–89 °C | 90 % |
 | ≥ 90 °C | 100 % |
 
-Ramp-up is immediate; ramp-down has 3 °C of hysteresis. The duty is re-asserted every 60 s in case the MCU resets.
+Ramp-up requires the higher band to be **sustained for 3 consecutive samples (15 s)** so that single-sample temperature spikes from background bursts don't audibly bump the fan; at or above **70 °C** the ramp is immediate (real load reaches that within seconds and shouldn't wait). Ramp-down has 3 °C of hysteresis. The duty is re-asserted every 60 s in case the MCU resets.
 
 **Failsafe:** if the service exits for any reason, an EXIT trap returns the MCU to factory default. The worst failure mode is a *loud* fan, never a *stopped* one. systemd (`Restart=always`) then brings the quiet mode back.
 
