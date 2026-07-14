@@ -57,7 +57,7 @@ i2cget -y 0 0x69 0x04 i 8
 
 | Reg | Value seen | Interpretation |
 |-----|-----------|----------------|
-| `0x02` | varies | **Not** a tachometer (does not correlate with duty) |
+| `0x02`–`0x03` | 16-bit LE, ~53k–60k at low duty | Looks like the tach **period** (drops as duty rises); `0x02` alone is just its noisy low byte |
 | `0x06` | `0x29` (41) | Temperature in °C, tracks CPU package temp |
 | `0x07`–`0x14` | `0x17`/`0x83`/`0x10` | Unknown; looks like a table (fan curve?) |
 | `0x15`+ | NAK | Not present |
@@ -80,7 +80,7 @@ Notes:
 | 80–89 °C | 90 % |
 | ≥ 90 °C | 100 % |
 
-Ramp-up requires the higher band to be **sustained for 3 consecutive samples (15 s)** so that single-sample temperature spikes from background bursts don't audibly bump the fan; at or above **70 °C** the ramp is immediate (real load reaches that within seconds and shouldn't wait). Ramp-down has 3 °C of hysteresis. The duty is re-asserted every 60 s in case the MCU resets.
+Ramp-up requires the higher band to be **sustained**: 3 consecutive samples (15 s) normally, 2 samples (10 s) at or above 70 °C, and single-sample only at or above 90 °C. This matters because ZimaOS background services (`icewhale-files` in particular) produce ~2 s CPU bursts that spike the package temperature to 70–83 °C every minute or so at idle; reacting to single samples makes the fan audibly "boost" for no thermal reason. Heat only matters if it is sustained, and the CPU's own throttling at 100 °C is the hardware backstop. Ramp-down has 3 °C of hysteresis. The duty is re-asserted every 60 s in case the MCU resets.
 
 **Failsafe:** if the service exits for any reason, an EXIT trap returns the MCU to factory default. The worst failure mode is a *loud* fan, never a *stopped* one. systemd (`Restart=always`) then brings the quiet mode back.
 

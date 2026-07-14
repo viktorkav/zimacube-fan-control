@@ -13,8 +13,9 @@ ADDR=0x69
 REG=0x04
 INTERVAL=5
 REASSERT_CYCLES=12   # rewrite the duty every 60s even if unchanged
-PANIC_TEMP=70        # at or above this, ramp up immediately (no sustain check)
-SUSTAIN_SAMPLES=3    # below panic, require this many consecutive samples before ramping up
+EMERGENCY_TEMP=90    # at or above this, ramp up on a single sample
+FAST_TEMP=70         # at or above this, 2 consecutive samples are enough
+SUSTAIN_SAMPLES=3    # otherwise, require this many consecutive samples before ramping up
 
 set_duty() { # $1 = duty, $2 = temp (for the log line)
     echo "duty -> ${1}% (cpu ${2}C)"
@@ -56,14 +57,17 @@ while :; do
     t=$(( $(cat "$TEMP_PATH") / 1000 ))
     d=$(duty_for "$t")
     if [ "$d" -gt "$last_duty" ]; then
-        # single-sample temp spikes (background bursts) shouldn't audibly bump
-        # the fan: require a sustained rise, unless the temp is genuinely high
-        if [ "$t" -ge "$PANIC_TEMP" ] || [ "$last_duty" -lt 0 ]; then
+        # single-sample temp spikes (ZimaOS background bursts reach 70-83°C for
+        # ~2s) shouldn't audibly bump the fan: heat only matters if sustained.
+        # The CPU's own throttling at 100°C is the hardware backstop.
+        if [ "$t" -ge "$EMERGENCY_TEMP" ] || [ "$last_duty" -lt 0 ]; then
             set_duty "$d" "$t" && last_duty=$d
             pending_up=0
         else
             pending_up=$(( pending_up + 1 ))
-            if [ "$pending_up" -ge "$SUSTAIN_SAMPLES" ]; then
+            need=$SUSTAIN_SAMPLES
+            [ "$t" -ge "$FAST_TEMP" ] && need=2
+            if [ "$pending_up" -ge "$need" ]; then
                 set_duty "$d" "$t" && last_duty=$d
                 pending_up=0
             fi
