@@ -16,7 +16,8 @@ REASSERT_CYCLES=12   # rewrite the duty every 60s even if unchanged
 PANIC_TEMP=70        # at or above this, ramp up immediately (no sustain check)
 SUSTAIN_SAMPLES=3    # below panic, require this many consecutive samples before ramping up
 
-set_duty() {
+set_duty() { # $1 = duty, $2 = temp (for the log line)
+    echo "duty -> ${1}% (cpu ${2}C)"
     $I2CSET -y $BUS $ADDR $REG 0x01 "$(printf '0x%02x' "$1")" 0x00 0x00 0x00 0x00 0x01 0x00 i
 }
 
@@ -58,12 +59,12 @@ while :; do
         # single-sample temp spikes (background bursts) shouldn't audibly bump
         # the fan: require a sustained rise, unless the temp is genuinely high
         if [ "$t" -ge "$PANIC_TEMP" ] || [ "$last_duty" -lt 0 ]; then
-            set_duty "$d" && last_duty=$d
+            set_duty "$d" "$t" && last_duty=$d
             pending_up=0
         else
             pending_up=$(( pending_up + 1 ))
             if [ "$pending_up" -ge "$SUSTAIN_SAMPLES" ]; then
-                set_duty "$d" && last_duty=$d
+                set_duty "$d" "$t" && last_duty=$d
                 pending_up=0
             fi
         fi
@@ -72,13 +73,13 @@ while :; do
         # ramping down: 3°C hysteresis to avoid oscillating at band edges
         d_hyst=$(duty_for $(( t + 3 )))
         if [ "$d_hyst" -lt "$last_duty" ]; then
-            set_duty "$d_hyst" && last_duty=$d_hyst
+            set_duty "$d_hyst" "$t" && last_duty=$d_hyst
         fi
     else
         pending_up=0
         if [ "$cycles" -ge "$REASSERT_CYCLES" ]; then
             # periodic re-assert in case the MCU reset on its own
-            set_duty "$d"
+            set_duty "$d" "$t"
             cycles=0
         fi
     fi
