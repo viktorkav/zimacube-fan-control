@@ -1,0 +1,12 @@
+[Unit]
+Description=ZimaCube fan control (MCU I2C 0x69, temp-based duty)
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/opt/zima-fan/fan-control.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
